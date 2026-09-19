@@ -1,5 +1,6 @@
 #!/bin/sh
 
+LANG=C
 NULLFILE=/dev/null
 
 get_os_release_file() {
@@ -14,7 +15,7 @@ get_os_release_file() {
 }
 
 get_os_id() {
-    if [ "$UNAME" = "Linux" ]; then
+    if [ "$(uname)" = "Linux" ]; then
         printf "%s" "$OS_RELEASE" | grep '^ID=' | cut -d= -f2 | tr -d '"'
     else
         printf "" # 待实现
@@ -22,7 +23,7 @@ get_os_id() {
 }
 
 get_os_name() {
-    if [ "$UNAME" = "Linux" ]; then
+    if [ "$(uname)" = "Linux" ]; then
         printf "%s" "$OS_RELEASE" | grep '^PRETTY_NAME=' | cut -d= -f2 | tr -d '"()'
     else
         printf "" # 待实现
@@ -34,17 +35,13 @@ get_arch() {
 }
 
 is_android() {
-    # 该函数的信息可以被伪造，但是我也没有更好的办法检测是否是安卓了 zwz
-    if [ "$UNAME" = "Linux" ]; then
-        if [ -f /system/build.prop ]; then
-            return 0
-        fi
+    uname -o 2> $NULLFILE | grep -q "Android" && return 0
 
-        if command -v getprop > $NULLFILE; then
-            return 0
-        fi
+    [ "$(uname)" = "Linux" ] || return 1
 
-        if [ -d /storage/emulated ]; then
+    if command -v getprop > $NULLFILE; then
+        build_sdk=$(getprop ro.build.version.sdk 2> $NULLFILE)
+        if [ -n "$build_sdk" ] 2> $NULLFILE; then
             return 0
         fi
     fi
@@ -58,11 +55,12 @@ get_platform() {
 }
 
 get_host_name() {
-    if [ "$UNAME" = "Linux" ]; then
+    if [ "$(uname)" = "Linux" ]; then
         if command -v hostnamectl > $NULLFILE; then
             hostnamectl | grep 'Hardware Model' | cut -d':' -f2 | xargs
-        else
+        elif [ -f /sys/devices/virtual/dmi/id/product_name ]; then
             cat /sys/devices/virtual/dmi/id/product_name
+            return 0
         fi
     else
         printf "" # 待实现
@@ -74,13 +72,16 @@ get_kernel() {
 }
 
 get_uptime() {
-    if [ "$UNAME" = "Linux" ]; then
-        seconds=$(awk '{print int($1)}' /proc/uptime)
-        days=$((seconds / 86400))
-        hours=$(( (seconds % 86400) / 3600 ))
-        minutes=$(( (seconds % 3600) / 60 ))
+    if [ "$(uname)" = "Linux" ]; then
+        if [ -r /proc/uptime ]; then
+            seconds=$(awk '{print int($1)}' /proc/uptime)
+            days=$((seconds / 86400))
+            hours=$(( (seconds % 86400) / 3600 ))
+            minutes=$(( (seconds % 3600) / 60 ))
 
-        printf "%dD %dH %dM" $days $hours $minutes
+            printf "%dD %dH %dM" $days $hours $minutes
+            return 0
+        fi
     else
         printf "" # 待实现
     fi
@@ -88,7 +89,7 @@ get_uptime() {
 
 get_shell_path() {
     if command -v getent > $NULLFILE; then
-        getent passwd "$USER" | cut -d: -f7
+        getent passwd "$(id -un)" | cut -d: -f7
     else
         grep "^$(whoami):" /etc/passwd | cut -d: -f7
     fi
@@ -110,7 +111,7 @@ get_de() {
 }
 
 get_package_manager() {
-    managers="brew cave dnf dpkg-query emerge eopkg flatpak nix-env pacman pacstall pkg pm port rpm xbps-query yay yum zypper"
+    managers="apt dnf rpm pacman pkg eopkg nix-env yum zypper dpkg-install pm port pacstall emerge cave yay brew flatpak"
     found=""
 
     for m in $managers; do
@@ -127,14 +128,27 @@ get_package_manager() {
 }
 
 get_cpu() {
-    if [ "$UNAME" = "Linux" ]; then
-        model="$(sed -n 's/^model name[[:space:]]*:[[:space:]]*//p' /proc/cpuinfo | head -n1)"
-        cores="$(grep -c '^processor' /proc/cpuinfo)"
+    if [ "$(uname)" = "Linux" ]; then
+        if command -v lscpu > $NULLFILE; then
+            model="$(lscpu 2> $NULLFILE | sed -n 's/^[[:space:]]*Model name:[[:space:]]*//p' | awk 'NR>1{printf ", "} {printf "%s", $0} END{print ""}')"
+            cores="$(lscpu 2> $NULLFILE | sed -n 's/^[[:space:]]*CPU(s):[[:space:]]*//p' | head -n 1)"
+
+            printf "%s (%s)" "$model" "$cores"
+            return 0
+        elif [ -f /proc/cpuinfo ]; then
+            model="$(sed -nE 's/^(model name|Hardware)[[:space:]]*:[[:space:]]*//p' /proc/cpuinfo | head -n1)"
+            cores="$(grep -c '^processor' /proc/cpuinfo)"
+
+            if is_android && [ -z "$model" ]; then
+                model=$(getprop ro.soc.model)
+            fi
+
+            printf "%s (%s)" "$model" "$cores"
+            return 0
+        fi
     else
         printf "" # 待实现
     fi
-
-    printf "%s (%s)" "$model" "$cores"
 }
 
 get_gpu() {
@@ -423,8 +437,9 @@ repeat_line() {
 }
 
 get_logo_width() {
-    first_line=$(printf '%s' "$OS_LOGO" | head -n1)
-    printf '%s' "$first_line" | wc -m
+    first_line=$(printf '%s\n' "$OS_LOGO" | head -n1)
+    bytes=$(printf '%s' "$first_line" | wc -c)
+    printf '%d\n' $((bytes / 3)) # LANG 爲 C 的情況下，一個盲文字符長度是 3
 }
 
 draw_table() {
@@ -504,7 +519,7 @@ fill_info() {
     _print_info 2 "$left_col" "SYSTEM" "$right_col" "$(get_os_name)" "$max_len"
     _print_info 3 "$left_col" "PLATFORM" "$right_col" "$(get_platform)" "$max_len"
     _print_info 4 "$left_col" "HOST" "$right_col" "$(get_host_name)" "$max_len"
-    _print_info 5 "$left_col" "KERNEL" "$right_col" "$UNAME $(get_kernel)" "$max_len"
+    _print_info 5 "$left_col" "KERNEL" "$right_col" "$(uname) $(get_kernel)" "$max_len"
     _print_info 6 "$left_col" "UPTIME" "$right_col" "$(get_uptime)" "$max_len"
     _print_info 7 "$left_col" "SHELL" "$right_col" "$(get_shell)" "$max_len"
     _print_info 8 "$left_col" "DESKTOP" "$right_col" "$(get_de)" "$max_len"
@@ -543,8 +558,6 @@ while getopts ":l:h" opt; do
 done
 
 shift $((OPTIND - 1))
-
-UNAME=$(uname)
 
 OS_RELEASE_FILE=$(get_os_release_file)
 if [ -n "$OS_RELEASE_FILE" ]; then
