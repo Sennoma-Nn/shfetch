@@ -158,11 +158,16 @@ get_shell() {
 get_de() {
     if [ -n "$XDG_CURRENT_DESKTOP" ]; then
         printf "%s" "$XDG_CURRENT_DESKTOP"
+        return 0
     elif [ -n "$DESKTOP_SESSION" ]; then
         printf "%s" "$DESKTOP_SESSION"
+        return 0
     elif [ -n "$GDMSESSION" ]; then
         printf "%s" "$GDMSESSION"
+        return 0
     fi
+
+    return 1
 }
 
 get_package_manager() {
@@ -231,7 +236,7 @@ get_gpu() {
     fi
 }
 
-get_meminfo() {
+get_mem() {
     [ -r /proc/meminfo ] || return 1
 
     mem_kb=$(awk '/^MemTotal:/{print $2; exit}' /proc/meminfo)
@@ -540,6 +545,12 @@ get_logo_width() {
 }
 
 draw_table() {
+    get_cpu > $NULLFILE 2>&1 && DEVICE_LINES=$((DEVICE_LINES + 1))
+    get_gpu > $NULLFILE 2>&1 && DEVICE_LINES=$((DEVICE_LINES + 1))
+    get_mem > $NULLFILE 2>&1 && DEVICE_LINES=$((DEVICE_LINES + 1))
+    [ "$DEVICE_LINES" -gt 0 ] && DEVICE_LINES=$((DEVICE_LINES + 2))
+    [ "$DEVICE_LINES" -eq 0 ] && DEVICE_LINES=$((DEVICE_LINES - 1))
+
     logo_table_width=$((LOGO_WIDTH + 4))
     logo_table_dash=$(repeat_char "-" $logo_table_width)
     sys_info_dash=$(repeat_char "-" 35)
@@ -547,8 +558,9 @@ draw_table() {
     printf "\033[0m"
 
     # 防止距离底部不足表格的高度打印后换行导致 esc[s 存储的位置错误
-    repeat_char "\n" 18 #
-    printf "\033[18A"
+    down_lines=$((13 + DEVICE_LINES))
+    repeat_char "\n" $down_lines #
+    printf "\033[%sA" $down_lines
 
     printf "\033[s"
     
@@ -563,12 +575,12 @@ draw_table() {
     # 打印表格一二部分中间 +-- ... --+-- ... --+
     printf "+%s+%s+\n" "$logo_table_dash" "$sys_info_dash"
 
-    # 打印第而个部分内容区域 | ...... | 共五行
+    # 打印第而个部分内容区域 | ...... |
     table_down="$(printf "|  \033[%dG     \033[31C  |" $logo_table_width)"
-    repeat_line 5 "$table_down"
+    repeat_line "$DEVICE_LINES" "$table_down"
 
-    # 打印表格底部 +-- ...... --+
-    printf "+%s-%s+\n" "$logo_table_dash" "$sys_info_dash"
+    # 打印表格底部 +-- ...... --+ 如果沒有獲取到任何硬體信息就不列印
+    [ "$DEVICE_LINES" -gt 0 ] && printf "+%s-%s+\n" "$logo_table_dash" "$sys_info_dash"
 }
 
 _print_title() {
@@ -589,7 +601,8 @@ fill_title() {
 
     _print_title 10 $((LOGO_WIDTH + 4 - ${#show_id})) "$show_id"
     _print_title 10 $((LOGO_WIDTH + 34)) "SYSTEM"
-    _print_title 16 $((LOGO_WIDTH + 34)) "DEVICE"
+
+    [ "$DEVICE_LINES" -gt 0 ] && _print_title $((11 + DEVICE_LINES)) $((LOGO_WIDTH + 34)) "DEVICE"
 
     printf '\033[0m'
 }
@@ -632,9 +645,9 @@ fill_info() {
     if v=$(get_shell 2> $NULLFILE);           then _print_info $line "$left_col" "SHELL"    "$right_col" "$v"          $sys_info_max_len; line=$((line+1)); fi
 
     line=13
-    if v=$(get_cpu 2> $NULLFILE);     then _print_info $line 4 "CPU" 8 "$v" $dev_info_max_len; line=$((line+1)); fi
-    if v=$(get_gpu 2> $NULLFILE);     then _print_info $line 4 "GPU" 8 "$v" $dev_info_max_len; line=$((line+1)); fi
-    if v=$(get_meminfo 2> $NULLFILE); then _print_info $line 4 "RAM" 8 "$v" $dev_info_max_len; line=$((line+1)); fi
+    if v=$(get_cpu 2> $NULLFILE); then _print_info $line 4 "CPU" 8 "$v" $dev_info_max_len; line=$((line+1)); fi
+    if v=$(get_gpu 2> $NULLFILE); then _print_info $line 4 "GPU" 8 "$v" $dev_info_max_len; line=$((line+1)); fi
+    if v=$(get_mem 2> $NULLFILE); then _print_info $line 4 "RAM" 8 "$v" $dev_info_max_len; line=$((line+1)); fi
 }
 
 reset_cursor_to_end() {
@@ -676,6 +689,7 @@ fi
 OS_ID=$(get_os_id)
 OS_LOGO=$(get_logo)
 LOGO_WIDTH=$(get_logo_width)
+DEVICE_LINES=0
 
 draw_table
 fill_title
