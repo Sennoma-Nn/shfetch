@@ -1,6 +1,7 @@
 #!/bin/sh
 
-LANG=C
+export LANG=C
+
 NULLFILE=/dev/null
 
 get_os_release_file() {
@@ -16,7 +17,7 @@ get_os_release_file() {
 
 get_os_id() {
     if [ "$(uname)" = "Linux" ]; then
-        printf "%s" "$OS_RELEASE" | grep '^ID=' | cut -d= -f2 | tr -d '"'
+        printf "%s" "$OS_RELEASE" | grep '^ID=' | cut -d= -f2- | tr -d '"'
     else
         printf "" # 待实现
         return 1
@@ -25,7 +26,7 @@ get_os_id() {
 
 get_os_name() {
     if [ "$(uname)" = "Linux" ]; then
-        printf "%s" "$OS_RELEASE" | grep '^PRETTY_NAME=' | cut -d= -f2 | tr -d '"()'
+        printf "%s" "$OS_RELEASE" | grep '^PRETTY_NAME=' | cut -d= -f2- | tr -d '"()'
     else
         printf "" # 待实现
         return 1
@@ -43,7 +44,7 @@ is_android() {
 
     if command -v getprop > $NULLFILE; then
         build_sdk=$(getprop ro.build.version.sdk 2> $NULLFILE)
-        if [ -n "$build_sdk" ] 2> $NULLFILE; then
+        if [ -n "$build_sdk" ]; then
             return 0
         fi
     fi
@@ -58,12 +59,26 @@ get_platform() {
 
 get_host_name() {
     if [ "$(uname)" = "Linux" ]; then
-        if command -v hostnamectl > $NULLFILE; then
-            hostnamectl | grep 'Hardware Model' | cut -d':' -f2 | xargs
-        elif [ -f /sys/devices/virtual/dmi/id/product_name ]; then
-            cat /sys/devices/virtual/dmi/id/product_name
+        name=$(hostnamectl 2>/dev/null | sed -n 's/^[[:space:]]*Hardware Model:[[:space:]]*//p' | head -n1)
+        if [ -n "$name" ]; then
+            printf '%s' "$name"
             return 0
         fi
+
+        if [ -f /sys/devices/virtual/dmi/id/product_name ]; then
+            name=$(cat /sys/devices/virtual/dmi/id/product_name)
+            if [ -n "$name" ]; then
+                printf '%s' "$name"
+                return 0
+            fi
+        fi
+
+        if [ -n "$HOSTNAME" ]; then
+            printf '%s' "$HOSTNAME"
+            return 0
+        fi
+
+        return 1
     else
         printf "" # 待实现
         return 1
@@ -92,11 +107,30 @@ get_uptime() {
 }
 
 get_shell_path() {
+    user="$(id -un)"
+
     if command -v getent > $NULLFILE; then
-        getent passwd "$(id -un)" | cut -d: -f7
-    else
-        grep "^$(whoami):" /etc/passwd | cut -d: -f7
+        shell_path=$(getent passwd "$user" | cut -d: -f7)
+        if [ -n "$shell_path" ]; then
+            printf '%s' "$shell_path"
+            return 0
+        fi
     fi
+    
+    if [ -r /etc/passwd ]; then
+        shell_path=$(grep "^$user:" /etc/passwd | cut -d: -f7)
+        if [ -n "$shell_path" ]; then
+            printf '%s' "$shell_path"
+            return 0
+        fi
+    fi
+
+    if [ -n "$SHELL" ]; then
+        printf '%s' "$SHELL"
+        return 0
+    fi
+
+    return 1
 }
 
 get_shell() {
@@ -115,7 +149,7 @@ get_de() {
 }
 
 get_package_manager() {
-    managers="apt dnf rpm pacman pkg eopkg nix-env yum zypper dpkg-install pm port pacstall emerge cave yay brew flatpak"
+    managers="apt dnf rpm pacman xbps-install pkg eopkg nix-env yum zypper dpkg pm port pacstall emerge cave yay brew flatpak"
     found=""
 
     for m in $managers; do
@@ -139,7 +173,7 @@ get_cpu() {
     if [ "$(uname)" = "Linux" ]; then
         if command -v lscpu > $NULLFILE; then
             model="$(lscpu 2> $NULLFILE | sed -n 's/^[[:space:]]*Model name:[[:space:]]*//p' | join_comma)"
-            cores="$(lscpu 2> $NULLFILE | sed -n 's/^[[:space:]]*CPU(s):[[:space:]]*//p' | head -n 1)"
+            cores="$(lscpu 2> $NULLFILE | sed -n 's/^[[:space:]]*CPU(s):[[:space:]]*//p' | tr -d ' ' | head -n 1)"
         elif [ -f /proc/cpuinfo ]; then
             model="$(sed -nE 's/^(model name|Hardware)[[:space:]]*:[[:space:]]*//p' /proc/cpuinfo | awk '!seen[$0]++' | join_comma)"
             cores="$(grep -c '^processor' /proc/cpuinfo)"
@@ -166,7 +200,7 @@ get_cpu() {
 
 get_gpu() {
     if command -v lspci > $NULLFILE; then
-        lspci 2> $NULLFILE | grep -iE "VGA|3D|Display" | cut -d':' -f3- | tr '\n' ', '| sed 's/^[[:space:]]*//' | sed 's/,$//'
+        lspci 2> $NULLFILE | grep -iE "VGA|3D|Display" | cut -d':' -f3- | join_comma | sed 's/^[[:space:]]*//' | sed 's/,$//'
         return 0
     elif command -v nvidia-smi > $NULLFILE; then
         nvidia-smi --query-gpu=gpu_name --format=csv,noheader 2> $NULLFILE | join_comma
@@ -191,7 +225,7 @@ get_logo() {
         logo=$(printf '%s' "$OS_ID" | tr '[:upper:]' '[:lower:]')
     fi
 
-    case $logo in
+    case "$logo" in
         arch)
             printf '%s\n' \
                 "⠀⠀⠀⠀⠀⠀⠀⢠⡄⠀⠀⠀⠀⠀⠀⠀" \
@@ -455,7 +489,7 @@ repeat_line() {
 }
 
 get_logo_width() {
-    first_line=$(printf '%s\n' "$OS_LOGO" | head -n1)
+    first_line=$(printf '%s\n' "$OS_LOGO" | head -n1) # 寬度獲取的是第一行，所以第一行的寬度必須和圖標最寬的地方一樣寬，推薦所有行寬度一樣
     bytes=$(printf '%s' "$first_line" | wc -c)
     printf '%d\n' $((bytes / 3)) # LANG 爲 C 的情況下，一個盲文字符長度是 3
 }
@@ -477,7 +511,7 @@ draw_table() {
     printf "+%s+%s+\n" "$logo_table_dash" "$sys_info_dash"
 
     # 打印第一个部分内容区域 | ... | ... | 共十行
-    # 设计之初为了 logo 的美观等，所有的 logo 高度都是 8 宽度不定，上下各空两行，至于为什么是 8 因为盲文 logo > 8 会有密集恐惧症（
+    # 设计之初为了 logo 的美观等，所有的 logo 高度都是盲文 8 宽度不定，上下各空两行，至于为什么是 8 因为盲文 logo > 8 会有密集恐惧症（
     table_up="$(printf "|  \033[%dG  |  \033[31C  |" $logo_table_width)"
     repeat_line 10 "$table_up"
 
@@ -525,6 +559,7 @@ _print_info() {
     right_text=$(printf "%s" "$5" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
     max_len=$6
 
+    [ -z "$right_text" ] && return 1
     printf "\033[u\033[%dB\033[%dG%s\033[%dG: %.${max_len}s" "$row" "$left_col" "$left_text" "$right_col" "$right_text"
 }
 
@@ -537,18 +572,20 @@ fill_info() {
     sys_info_max_len=21
     dev_info_max_len=$((LOGO_WIDTH + 30))
 
-    _print_info 2 "$left_col" "SYSTEM" "$right_col" "$(get_os_name 2> $NULLFILE)" $sys_info_max_len
-    _print_info 3 "$left_col" "PLATFORM" "$right_col" "$(get_platform 2> $NULLFILE)" $sys_info_max_len
-    _print_info 4 "$left_col" "HOST" "$right_col" "$(get_host_name 2> $NULLFILE)" $sys_info_max_len
-    _print_info 5 "$left_col" "KERNEL" "$right_col" "$(uname) $(get_kernel 2> $NULLFILE)" $sys_info_max_len
-    _print_info 6 "$left_col" "UPTIME" "$right_col" "$(get_uptime 2> $NULLFILE)" $sys_info_max_len
-    _print_info 7 "$left_col" "SHELL" "$right_col" "$(get_shell 2> $NULLFILE)" $sys_info_max_len
-    _print_info 8 "$left_col" "DESKTOP" "$right_col" "$(get_de 2> $NULLFILE)" $sys_info_max_len
-    _print_info 9 "$left_col" "PACKAGE" "$right_col" "$(get_package_manager 2> $NULLFILE)" $sys_info_max_len
+    line=2
+    _print_info $line "$left_col" "SYSTEM" "$right_col" "$(get_os_name 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
+    _print_info $line "$left_col" "PLATFORM" "$right_col" "$(get_platform 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
+    _print_info $line "$left_col" "HOST" "$right_col" "$(get_host_name 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
+    _print_info $line "$left_col" "KERNEL" "$right_col" "$(uname) $(get_kernel 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
+    _print_info $line "$left_col" "UPTIME" "$right_col" "$(get_uptime 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
+    _print_info $line "$left_col" "SHELL" "$right_col" "$(get_shell 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
+    _print_info $line "$left_col" "DESKTOP" "$right_col" "$(get_de 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
+    _print_info $line "$left_col" "PACKAGE" "$right_col" "$(get_package_manager 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
 
-    _print_info 13 4 "CPU" 8 "$(get_cpu 2> $NULLFILE)" $dev_info_max_len
-    _print_info 14 4 "GPU" 8 "$(get_gpu 2> $NULLFILE)" $dev_info_max_len
-    _print_info 15 4 "RAM" 8 "$(get_meminfo 2> $NULLFILE)" $dev_info_max_len
+    line=13
+    _print_info $line 4 "CPU" 8 "$(get_cpu 2> $NULLFILE)" $dev_info_max_len && line=$((line + 1))
+    _print_info $line 4 "GPU" 8 "$(get_gpu 2> $NULLFILE)" $dev_info_max_len && line=$((line + 1))
+    _print_info $line 4 "RAM" 8 "$(get_meminfo 2> $NULLFILE)" $dev_info_max_len && line=$((line + 1))
 }
 
 reset_cursor_to_end() {
