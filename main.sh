@@ -166,7 +166,7 @@ get_de() {
 }
 
 get_package_manager() {
-    managers="apt dnf rpm pacman xbps-install pkg eopkg nix-env yum zypper dpkg pm port pacstall emerge cave yay brew flatpak"
+    managers="apt dnf rpm pacman xbps-install pkg apk eopkg nix-env yum zypper dpkg pm port pacstall emerge cave yay brew flatpak"
     found=""
 
     for m in $managers; do
@@ -232,9 +232,12 @@ get_gpu() {
 }
 
 get_meminfo() {
-    mem_kb=$(grep 'MemTotal' /proc/meminfo | awk '{print $2}')
-    mem_gib=$(awk "BEGIN {printf \"%.1f\", $mem_kb / 1024 / 1024}")
+    [ -r /proc/meminfo ] || return 1
 
+    mem_kb=$(awk '/^MemTotal:/{print $2; exit}' /proc/meminfo)
+    [ -n "$mem_kb" ] || return 1
+
+    mem_gib=$(awk "BEGIN {printf \"%.1f\", $mem_kb / 1024 / 1024}")
     printf "%s GiB" "$mem_gib"
 }
 
@@ -246,6 +249,17 @@ get_logo() {
     fi
 
     case "$logo" in
+        alpine)
+            printf '%s\n' \
+                "⠀⠀⠀⢀⣼⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧⡀⠀⠀⠀" \
+                "⠀⠀⢀⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣷⡀⠀⠀" \
+                "⠀⢠⣿⣿⣿⣿⡿⠋⠙⢿⡿⠟⢿⣿⣿⣿⣿⡄⠀" \
+                "⣰⣿⣿⣿⡿⠋⢀⣴⣄⠀⠀⢀⠀⠙⢿⣿⣿⣿⣆" \
+                "⠹⣿⣟⠉⢀⣔⠁⣿⣿⣷⣄⠀⢑⣄⠀⢙⣿⣿⠏" \
+                "⠀⠘⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠃⠀" \
+                "⠀⠀⠈⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠁⠀⠀" \
+                "⠀⠀⠀⠈⢻⣿⣿⣿⣿⣿⣿⣿⣿⣿⡟⠁⠀⠀⠀" \
+            ;;
         arch)
             printf '%s\n' \
                 "⠀⠀⠀⠀⠀⠀⠀⢠⡄⠀⠀⠀⠀⠀⠀⠀" \
@@ -256,6 +270,17 @@ get_logo() {
                 "⠀⠀⢠⣿⣿⣿⠇⠀⠀⠸⣿⣿⣿⣄⠀⠀" \
                 "⠀⣠⣿⣿⡿⠿⠄⠀⠀⠠⠿⢿⣿⣦⣄⠀" \
                 "⡰⠟⠋⠁⠀⠀⠀⠀⠀⠀⠀⠀⠈⠙⠻⢆"
+            ;;
+        artix)
+            printf '%s\n' \
+                "⠀⠀⠀⠀⠀⠀⠀⣰⣆⠀⠀⠀⠀⠀⠀⠀" \
+                "⠀⠀⠀⠀⠀⠀⣰⣿⣿⣆⠀⠀⠀⠀⠀⠀" \
+                "⠀⠀⠀⠀⠀⢰⣿⣿⣿⣿⣆⠀⠀⠀⠀⠀" \
+                "⠀⠀⠀⠀⣀⡀⠈⠛⠿⣿⣿⣆⠀⠀⠀⠀" \
+                "⠀⠀⠀⣰⣿⣿⣷⣶⣤⣀⠉⠻⢆⠀⠀⠀" \
+                "⠀⠀⣰⣿⣿⣿⣿⣿⣿⣿⡿⠗⠂⢀⠀⠀" \
+                "⠀⣰⣿⣿⣿⡿⠿⠛⠉⠁⣀⣴⣾⣿⣆⠀" \
+                "⣰⠿⠛⠉⠁⠀⠀⠀⠀⠀⠀⠉⠙⠛⠿⣆" \
             ;;
         cachyos)
             printf '%s\n' \
@@ -563,8 +588,8 @@ fill_title() {
     show_id=$(printf "%.${id_max_len}s" "$show_id")
 
     _print_title 10 $((LOGO_WIDTH + 4 - ${#show_id})) "$show_id"
-    _print_title 10 $((LOGO_WIDTH + 29)) "SYSTEM INFO"
-    _print_title 16 $((LOGO_WIDTH + 29)) "DEVICE INFO"
+    _print_title 10 $((LOGO_WIDTH + 34)) "SYSTEM"
+    _print_title 16 $((LOGO_WIDTH + 34)) "DEVICE"
 
     printf '\033[0m'
 }
@@ -584,7 +609,6 @@ _print_info() {
     right_text=$(printf "%s" "$5" | upper | tr '-' '_')
     max_len=$6
 
-    [ -z "$right_text" ] && return 1
     printf "\033[u\033[%dB\033[%dG%s\033[%dG: %.${max_len}s" "$row" "$left_col" "$left_text" "$right_col" "$right_text"
 }
 
@@ -598,19 +622,19 @@ fill_info() {
     dev_info_max_len=$((LOGO_WIDTH + 30))
 
     line=2
-    _print_info $line "$left_col" "SYSTEM" "$right_col" "$(get_os_name 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
-    _print_info $line "$left_col" "HOST" "$right_col" "$(get_host_name 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
-    _print_info $line "$left_col" "KERNEL" "$right_col" "$(uname) $(get_kernel 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
-    _print_info $line "$left_col" "PACKAGE" "$right_col" "$(get_package_manager 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
-    _print_info $line "$left_col" "UPTIME" "$right_col" "$(get_uptime 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
-    _print_info $line "$left_col" "PLATFORM" "$right_col" "$(get_platform 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
-    _print_info $line "$left_col" "DESKTOP" "$right_col" "$(get_de 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
-    _print_info $line "$left_col" "SHELL" "$right_col" "$(get_shell 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
+    if v=$(get_os_name 2> $NULLFILE);         then _print_info $line "$left_col" "SYSTEM"   "$right_col" "$v"          $sys_info_max_len; line=$((line+1)); fi
+    if v=$(get_host_name 2> $NULLFILE);       then _print_info $line "$left_col" "HOST"     "$right_col" "$v"          $sys_info_max_len; line=$((line+1)); fi
+    if v=$(get_kernel 2> $NULLFILE);          then _print_info $line "$left_col" "KERNEL"   "$right_col" "$(uname) $v" $sys_info_max_len; line=$((line+1)); fi
+    if v=$(get_package_manager 2> $NULLFILE); then _print_info $line "$left_col" "PACKAGE"  "$right_col" "$v"          $sys_info_max_len; line=$((line+1)); fi
+    if v=$(get_uptime 2> $NULLFILE);          then _print_info $line "$left_col" "UPTIME"   "$right_col" "$v"          $sys_info_max_len; line=$((line+1)); fi
+    if v=$(get_platform 2> $NULLFILE);        then _print_info $line "$left_col" "PLATFORM" "$right_col" "$v"          $sys_info_max_len; line=$((line+1)); fi
+    if v=$(get_de 2> $NULLFILE);              then _print_info $line "$left_col" "DESKTOP"  "$right_col" "$v"          $sys_info_max_len; line=$((line+1)); fi
+    if v=$(get_shell 2> $NULLFILE);           then _print_info $line "$left_col" "SHELL"    "$right_col" "$v"          $sys_info_max_len; line=$((line+1)); fi
 
     line=13
-    _print_info $line 4 "CPU" 8 "$(get_cpu 2> $NULLFILE)" $dev_info_max_len && line=$((line + 1))
-    _print_info $line 4 "GPU" 8 "$(get_gpu 2> $NULLFILE)" $dev_info_max_len && line=$((line + 1))
-    _print_info $line 4 "RAM" 8 "$(get_meminfo 2> $NULLFILE)" $dev_info_max_len && line=$((line + 1))
+    if v=$(get_cpu 2> $NULLFILE);     then _print_info $line 4 "CPU" 8 "$v" $dev_info_max_len; line=$((line+1)); fi
+    if v=$(get_gpu 2> $NULLFILE);     then _print_info $line 4 "GPU" 8 "$v" $dev_info_max_len; line=$((line+1)); fi
+    if v=$(get_meminfo 2> $NULLFILE); then _print_info $line 4 "RAM" 8 "$v" $dev_info_max_len; line=$((line+1)); fi
 }
 
 reset_cursor_to_end() {
