@@ -31,7 +31,7 @@ printf '%s\n' "$plain" | grep -q 'HOST'
 test "$(printf '%s\n' "$plain" | grep -c '^GPU      :')" -le 1
 
 external_plain=$(cd /tmp && TERM=dumb sh "$SHFETCH" --plain -l freebsd)
-printf '%s\n' "$external_plain" | grep -q "FreeBSD\|SYSTEM"
+printf '%s\n' "$external_plain" | grep -q 'SYSTEM'
 
 install_root=$(mktemp -d)
 trap 'rm -rf "$install_root"' EXIT HUP INT TERM
