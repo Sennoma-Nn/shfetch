@@ -7,7 +7,7 @@ VERSION=0.2.0
 PLAIN_OUTPUT=0
 LOGO_OVERRIDE=""
 
-LOGO_NAMES="alpine arch artix cachyos centos debian deepin elementary endeavouros fedora kali linuxmint macos manjaro march7th mx nixos opensuse redhat ubuntu void zorin"
+LOGO_NAMES="alpine arch artix cachyos centos debian deepin elementary endeavouros fedora freebsd kali linuxmint macos manjaro netbsd march7th mx nixos openbsd opensuse redhat ubuntu void windows windows10 zorin"
 
 upper() {
     tr '[:lower:]' '[:upper:]'
@@ -32,7 +32,11 @@ get_os_id() {
     if [ "$(uname)" = "Linux" ]; then
         get_os_value ID
     else
-        uname | lower
+        platform=$(uname | lower)
+        case "$platform" in
+            mingw*|msys*|cygwin*) printf 'windows' ;;
+            *) printf '%s' "$platform" ;;
+        esac
     fi
 }
 
@@ -259,6 +263,7 @@ get_mem() {
     fi
     if command -v sysctl > $NULLFILE; then
         mem_bytes=$(sysctl -n hw.memsize 2> $NULLFILE)
+        [ -n "$mem_bytes" ] || mem_bytes=$(sysctl -n hw.physmem 2> $NULLFILE)
         [ -n "$mem_bytes" ] || return 1
         awk -v bytes="$mem_bytes" 'BEGIN{printf "%.1f GiB", bytes/1024/1024/1024}'
         return 0
@@ -384,6 +389,17 @@ get_logo() {
                 "⣿⣿⣷⣄⣈⣉⣀⣴⣿⣿⣿⣿⣿⡿⠃⠀" \
                 "⠻⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿⠟⠉⠀⠀⠀" \
             ;;
+        freebsd)
+            printf '%s\n' \
+                "        _.._        " \
+                "      .'    '.      " \
+                "     /  .--.  \\     " \
+                "    /  /    \\  \\    " \
+                "    | |      | |    " \
+                "    \\  \\____/  /    " \
+                "     '._    _.'     " \
+                "        '--'        "
+            ;;
         kali)
             printf '%s\n' \
                 "⠀⠉⠉⠉⠑⠒⠲⠤⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀" \
@@ -461,7 +477,29 @@ get_logo() {
                 "⠀⠀⠈⠀⠀⣼⣿⣿⡄⠙⠛⣿⣿⠛⠛⠃⠀⠀" \
                 "⠀⠀⠀⠀⢾⡿⠁⢻⣿⡄⠀⠈⢿⡷⠀⠀⠀⠀"
             ;;
-        windows10)
+        netbsd)
+            printf '%s\n' \
+                "        /\\          " \
+                "       /  \\         " \
+                "      / /\\ \\        " \
+                "     / /  \\ \\       " \
+                "    /_/    \\_\\      " \
+                "    \\ \\    / /      " \
+                "     \\ \\__/ /       " \
+                "      \\____/        "
+            ;;
+        openbsd)
+            printf '%s\n' \
+                "      .------.      " \
+                "     /  .--.  \\     " \
+                "    |  /    \\  |    " \
+                "    | |  ()  | |    " \
+                "    |  \\____/  |    " \
+                "     \\  '--'  /     " \
+                "      '------'      " \
+                "       OpenBSD       "
+            ;;
+        windows|windows10)
             printf '%s\n' \
                 "⠀⠀⠀⢀⣀⣀⡀⢠⣤⣤⣤⣶⣶⣶⣿⣿" \
                 "⣿⣿⣿⣿⣿⣿⡇⢸⣿⣿⣿⣿⣿⣿⣿⣿" \
@@ -560,8 +598,18 @@ repeat_line() {
 
 get_logo_width() {
     first_line=$(printf '%s\n' "$OS_LOGO" | head -n1) # 寬度獲取的是第一行，所以第一行的寬度必須和圖標最寬的地方一樣寬，推薦所有行寬度一樣
-    bytes=$(printf '%s' "$first_line" | wc -c)
-    printf '%d\n' $((bytes / 3)) # LANG 爲 C 的情況下，一個盲文字符長度是 3
+    width=$(printf '%s\n' "$first_line" | LC_ALL=C.UTF-8 wc -L 2> $NULLFILE)
+    case "$width" in
+        ''|*[!0-9]*)
+            bytes=$(printf '%s' "$first_line" | wc -c)
+            if printf '%s' "$first_line" | LC_ALL=C grep -q '[^ -~]'; then
+                width=$((bytes / 3))
+            else
+                width=$bytes
+            fi
+            ;;
+    esac
+    printf '%d\n' "$width"
 }
 
 truncate_text() {

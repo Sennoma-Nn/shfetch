@@ -12,6 +12,10 @@ printf '%s\n' "$version" | grep -q '^shfetch '
 
 logos=$(sh "$SHFETCH" --list-logos)
 printf '%s\n' "$logos" | grep -qw ubuntu
+printf '%s\n' "$logos" | grep -qw freebsd
+printf '%s\n' "$logos" | grep -qw openbsd
+printf '%s\n' "$logos" | grep -qw netbsd
+printf '%s\n' "$logos" | grep -qw windows
 
 help=$(sh "$SHFETCH" --help)
 printf '%s\n' "$help" | grep -q -- '--plain'

@@ -32,6 +32,8 @@ shfetch [options]
 
 Plain mode is selected automatically when stdout is not a terminal, when `TERM=dumb`, or when the terminal is narrower than 70 columns. Long values are truncated to keep the layout aligned.
 
+Built-in logos include Alpine, Arch, Artix, CachyOS, Debian, Fedora, FreeBSD, Kali, Linux Mint, macOS, NetBSD, OpenBSD, openSUSE, Ubuntu, Void, Windows and others. Run `./main.sh --list-logos` for the complete list.
+
 ## Compatibility
 
 Linux is fully supported, including common distributions and Android environments. macOS and BSD provide best-effort generic system information where `sysctl` is available. Windows is not supported when running a native Windows shell; use WSL for Linux support.
