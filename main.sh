@@ -4,6 +4,14 @@ export LANG=C
 
 NULLFILE=/dev/null
 
+upper() {
+    tr '[:lower:]' '[:upper:]'
+}
+
+lower() {
+    tr '[:upper:]' '[:lower:]'
+}
+
 get_os_release_file() {
     if [ -f /etc/os-release ]; then
         os_release_file=/etc/os-release
@@ -22,6 +30,15 @@ get_os_id() {
         printf "" # 待实现
         return 1
     fi
+}
+
+get_os_id_with_override() {
+    if [ -n "$LOGO_OVERRIDE" ]; then
+        printf '%s' "$LOGO_OVERRIDE"
+        return 0
+    fi
+
+    get_os_id
 }
 
 get_os_name() {
@@ -161,8 +178,11 @@ get_package_manager() {
     found="${found# }"
 
     if [ -n "$found" ]; then
-        printf "%s\n" "$found"
+        printf "%s" "$found"
+        return 0
     fi
+
+    return 1
 }
 
 join_comma() {
@@ -220,9 +240,9 @@ get_meminfo() {
 
 get_logo() {
     if [ -n "$LOGO_OVERRIDE" ]; then
-        logo=$(printf '%s' "$LOGO_OVERRIDE" | tr '[:upper:]' '[:lower:]')
+        logo=$(printf '%s' "$LOGO_OVERRIDE" | lower)
     else
-        logo=$(printf '%s' "$OS_ID" | tr '[:upper:]' '[:lower:]')
+        logo=$(printf '%s' "$OS_ID" | lower)
     fi
 
     case "$logo" in
@@ -535,13 +555,18 @@ _print_title() {
 }
 
 fill_title() {
-    printf "\033[0m"
+    printf '\033[0m'
 
-    _print_title 10 $((LOGO_WIDTH)) "LOGO"
+    id_max_len=$((LOGO_WIDTH + 2))
+
+    show_id=$(get_os_id_with_override | upper)
+    show_id=$(printf "%.${id_max_len}s" "$show_id")
+
+    _print_title 10 $((LOGO_WIDTH + 4 - ${#show_id})) "$show_id"
     _print_title 10 $((LOGO_WIDTH + 29)) "SYSTEM INFO"
     _print_title 16 $((LOGO_WIDTH + 29)) "DEVICE INFO"
 
-    printf "\033[0m"
+    printf '\033[0m'
 }
 
 fill_logo() {
@@ -556,7 +581,7 @@ _print_info() {
     left_col=$2
     left_text="$3"
     right_col=$4
-    right_text=$(printf "%s" "$5" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
+    right_text=$(printf "%s" "$5" | upper | tr '-' '_')
     max_len=$6
 
     [ -z "$right_text" ] && return 1
@@ -574,13 +599,13 @@ fill_info() {
 
     line=2
     _print_info $line "$left_col" "SYSTEM" "$right_col" "$(get_os_name 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
-    _print_info $line "$left_col" "PLATFORM" "$right_col" "$(get_platform 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
     _print_info $line "$left_col" "HOST" "$right_col" "$(get_host_name 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
     _print_info $line "$left_col" "KERNEL" "$right_col" "$(uname) $(get_kernel 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
-    _print_info $line "$left_col" "UPTIME" "$right_col" "$(get_uptime 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
-    _print_info $line "$left_col" "SHELL" "$right_col" "$(get_shell 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
-    _print_info $line "$left_col" "DESKTOP" "$right_col" "$(get_de 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
     _print_info $line "$left_col" "PACKAGE" "$right_col" "$(get_package_manager 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
+    _print_info $line "$left_col" "UPTIME" "$right_col" "$(get_uptime 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
+    _print_info $line "$left_col" "PLATFORM" "$right_col" "$(get_platform 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
+    _print_info $line "$left_col" "DESKTOP" "$right_col" "$(get_de 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
+    _print_info $line "$left_col" "SHELL" "$right_col" "$(get_shell 2> $NULLFILE)" $sys_info_max_len && line=$((line + 1))
 
     line=13
     _print_info $line 4 "CPU" 8 "$(get_cpu 2> $NULLFILE)" $dev_info_max_len && line=$((line + 1))
