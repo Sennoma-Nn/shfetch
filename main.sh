@@ -100,23 +100,6 @@ get_host_name() {
     return 1
 }
 
-get_model() {
-    if [ "$UNAME_S" = "Linux" ]; then
-        if [ -r /sys/devices/virtual/dmi/id/product_name ]; then
-            model=$(cat /sys/devices/virtual/dmi/id/product_name)
-            [ -n "$model" ] && printf '%s' "$model" && return 0
-        fi
-        if command -v hostnamectl > $NULLFILE; then
-            model=$(hostnamectl 2> $NULLFILE | sed -n 's/^[[:space:]]*Hardware Model:[[:space:]]*//p' | head -n1)
-            [ -n "$model" ] && printf '%s' "$model" && return 0
-        fi
-    elif command -v sysctl > $NULLFILE; then
-        model=$(sysctl -n hw.model 2> $NULLFILE)
-        [ -n "$model" ] && printf '%s' "$model" && return 0
-    fi
-    return 1
-}
-
 get_kernel() {
     uname -r
 }
@@ -262,6 +245,23 @@ get_gpu() {
     return 1
 }
 
+get_hwm() {
+    if [ "$UNAME_S" = "Linux" ]; then
+        if [ -r /sys/devices/virtual/dmi/id/product_name ]; then
+            model=$(cat /sys/devices/virtual/dmi/id/product_name)
+            [ -n "$model" ] && printf '%s' "$model" && return 0
+        fi
+        if command -v hostnamectl > $NULLFILE; then
+            model=$(hostnamectl 2> $NULLFILE | sed -n 's/^[[:space:]]*Hardware Model:[[:space:]]*//p' | head -n1)
+            [ -n "$model" ] && printf '%s' "$model" && return 0
+        fi
+    elif command -v sysctl > $NULLFILE; then
+        model=$(sysctl -n hw.model 2> $NULLFILE)
+        [ -n "$model" ] && printf '%s' "$model" && return 0
+    fi
+    return 1
+}
+
 get_mem() {
     if [ -r /proc/meminfo ]; then
         mem_kb=$(awk '/^MemTotal:/{print $2; exit}' /proc/meminfo)
@@ -342,7 +342,6 @@ truncate_text() {
 collect_info() {
     INFO_SYSTEM=
     INFO_HOST=
-    INFO_MODEL=
     INFO_KERNEL=
     INFO_PACKAGE=
     INFO_UPTIME=
@@ -352,13 +351,14 @@ collect_info() {
     INFO_CPU=
     INFO_GPU=
     INFO_RAM=
+    INFO_HWM=
     HAS_CPU=0
     HAS_GPU=0
     HAS_RAM=0
+    HAS_HWM=0
 
     INFO_SYSTEM=$(get_os_name 2> $NULLFILE) || INFO_SYSTEM=
     INFO_HOST=$(get_host_name 2> $NULLFILE) || INFO_HOST=
-    INFO_MODEL=$(get_model 2> $NULLFILE) || INFO_MODEL=
     INFO_KERNEL="$UNAME_S $(get_kernel 2> $NULLFILE)"
     INFO_PACKAGE=$(get_package_manager 2> $NULLFILE) || INFO_PACKAGE=
     INFO_UPTIME=$(get_uptime 2> $NULLFILE) || INFO_UPTIME=
@@ -368,12 +368,14 @@ collect_info() {
 
     if INFO_CPU=$(get_cpu 2> $NULLFILE); then HAS_CPU=1; fi
     if INFO_GPU=$(get_gpu 2> $NULLFILE); then HAS_GPU=1; fi
+    if INFO_HWM=$(get_hwm 2> $NULLFILE); then HAS_HWM=1; fi
     if INFO_RAM=$(get_mem 2> $NULLFILE); then HAS_RAM=1; fi
 
     DEVICE_LINES=0
     [ "$HAS_CPU" -eq 1 ] && DEVICE_LINES=$((DEVICE_LINES + 1))
     [ "$HAS_GPU" -eq 1 ] && DEVICE_LINES=$((DEVICE_LINES + 1))
     [ "$HAS_RAM" -eq 1 ] && DEVICE_LINES=$((DEVICE_LINES + 1))
+    [ "$HAS_HWM" -eq 1 ] && DEVICE_LINES=$((DEVICE_LINES + 1))
     [ "$DEVICE_LINES" -gt 0 ] && DEVICE_LINES=$((DEVICE_LINES + 2))
     [ "$DEVICE_LINES" -eq 0 ] && DEVICE_LINES=$((DEVICE_LINES - 1))
 }
@@ -390,7 +392,6 @@ print_plain() {
     printf '%s\n' "$OS_LOGO"
     print_plain_field SYSTEM   "$INFO_SYSTEM"   80
     print_plain_field HOST     "$INFO_HOST"     80
-    print_plain_field MODEL    "$INFO_MODEL"    80
     print_plain_field KERNEL   "$INFO_KERNEL"   80
     print_plain_field PACKAGE  "$INFO_PACKAGE"  40
     print_plain_field UPTIME   "$INFO_UPTIME"   40
@@ -399,6 +400,7 @@ print_plain() {
     print_plain_field SHELL    "$INFO_SHELL"    40
     print_plain_field CPU      "$INFO_CPU"      100
     print_plain_field GPU      "$INFO_GPU"      100
+    print_plain_field HWM      "$INFO_HWM"      40
     print_plain_field RAM      "$INFO_RAM"      40
 }
 
@@ -491,7 +493,6 @@ fill_info() {
     line=2
     if [ -n "$INFO_SYSTEM" ];   then _print_info $line "$left_col" "SYSTEM"   "$right_col" "$INFO_SYSTEM"   $sys_info_max_len; line=$((line+1)); fi
     if [ -n "$INFO_HOST" ];     then _print_info $line "$left_col" "HOST"     "$right_col" "$INFO_HOST"     $sys_info_max_len; line=$((line+1)); fi
-    if [ -n "$INFO_MODEL" ];    then _print_info $line "$left_col" "MODEL"    "$right_col" "$INFO_MODEL"    $sys_info_max_len; line=$((line+1)); fi
     if [ -n "$INFO_KERNEL" ];   then _print_info $line "$left_col" "KERNEL"   "$right_col" "$INFO_KERNEL"   $sys_info_max_len; line=$((line+1)); fi
     if [ -n "$INFO_PACKAGE" ];  then _print_info $line "$left_col" "PACKAGE"  "$right_col" "$INFO_PACKAGE"  $sys_info_max_len; line=$((line+1)); fi
     if [ -n "$INFO_UPTIME" ];   then _print_info $line "$left_col" "UPTIME"   "$right_col" "$INFO_UPTIME"   $sys_info_max_len; line=$((line+1)); fi
@@ -502,11 +503,12 @@ fill_info() {
     line=13
     if [ "$HAS_CPU" -eq 1 ]; then _print_info $line 4 "CPU" 8 "$INFO_CPU" $dev_info_max_len; line=$((line+1)); fi
     if [ "$HAS_GPU" -eq 1 ]; then _print_info $line 4 "GPU" 8 "$INFO_GPU" $dev_info_max_len; line=$((line+1)); fi
+    if [ "$HAS_HWM" -eq 1 ]; then _print_info $line 4 "HWM" 8 "$INFO_HWM" $dev_info_max_len; line=$((line+1)); fi
     if [ "$HAS_RAM" -eq 1 ]; then _print_info $line 4 "RAM" 8 "$INFO_RAM" $dev_info_max_len; line=$((line+1)); fi
 }
 
 reset_cursor_to_end() {
-    printf "\033[u\033[18B"
+    printf "\033[u\033[%sB" $((13 + DEVICE_LINES))
     printf "\033[0m"
 }
 
@@ -601,4 +603,5 @@ else
     fill_logo
     fill_info
     reset_cursor_to_end
+    printf "\n"
 fi
