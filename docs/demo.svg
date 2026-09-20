@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="300" viewBox="0 0 780 300">
+  <rect width="780" height="300" rx="12" fill="#111827"/>
+  <rect x="18" y="18" width="744" height="264" rx="8" fill="#0b1220" stroke="#334155"/>
+  <circle cx="38" cy="38" r="6" fill="#f87171"/><circle cx="58" cy="38" r="6" fill="#fbbf24"/><circle cx="78" cy="38" r="6" fill="#34d399"/>
+  <g font-family="monospace" font-size="15" fill="#e5e7eb">
+    <text x="38" y="76" fill="#60a5fa">⠀⠀⠀⠀⢀⣤⣶⠿⠶⠶⣦⣄⡀</text>
+    <text x="38" y="96" fill="#60a5fa">⠀⠀⠀⣰⠿⠋⠁⠀⠀⠀⠀⠹⣿⡆</text>
+    <text x="38" y="116" fill="#60a5fa">⠀⠀⣸⠏⠀⠀⠀⡠⠒⠀⠀⠀⢸⡆</text>
+    <text x="38" y="136" fill="#60a5fa">⠀⠀⣿⠀⠀⠀⢸⠀⠀⠀⠀⠀⢸⠇</text>
+    <text x="38" y="156" fill="#60a5fa">⠀⠀⢿⠀⠀⠀⠈⢣⣀⠀⣀⡤⠋</text>
+    <text x="38" y="176" fill="#60a5fa">⠀⠀⠸⣷⠀⠀⠀⠀⠉⠉⠁</text>
+    <text x="38" y="196" fill="#60a5fa">⠀⠀⠀⠙⢦⠀⠀⠀⠀⠀⠀</text>
+    <text x="38" y="216" fill="#60a5fa">⠀⠀⠀⠀⠀⠙⠦⡀⠀⠀⠀⠀</text>
+    <text x="330" y="76" fill="#fbbf24">SYSTEM</text><text x="430" y="76">: Debian GNU/Linux</text>
+    <text x="330" y="98" fill="#fbbf24">HOST</text><text x="430" y="98">: workstation</text>
+    <text x="330" y="120" fill="#fbbf24">KERNEL</text><text x="430" y="120">: Linux 6.x</text>
+    <text x="330" y="142" fill="#fbbf24">PACKAGE</text><text x="430" y="142">: apt</text>
+    <text x="330" y="164" fill="#fbbf24">PLATFORM</text><text x="430" y="164">: x86_64</text>
+    <text x="330" y="198" fill="#fbbf24">CPU</text><text x="430" y="198">: 4 cores</text>
+    <text x="330" y="220" fill="#fbbf24">RAM</text><text x="430" y="220">: 16.0 GiB</text>
+  </g>
+</svg>
