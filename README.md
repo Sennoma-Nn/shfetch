@@ -32,16 +32,17 @@ Logo artwork is stored as one UTF-8 text file per logo under [`logos/`](logos/).
 
 ```text
 shfetch [options]
-  -l, --logo NAME   use a specific logo
-  -p, --plain       print without ANSI cursor controls
-      --version     print version
-      --list-logos  list supported logo names
-  -h, --help        show help
+  -l, --logo NAME       use a specific logo
+  -p, --plain           print without ANSI cursor controls
+  -t, --table           print use table
+  -V, --version         print version
+  -L  --list-logos      list supported logo names
+  -h, --help            show this help
 ```
 
 Plain mode is selected automatically when stdout is not a terminal, when `TERM=dumb`, or when the terminal is narrower than 70 columns. Long values are truncated to keep the layout aligned.
 
-Built-in logos include Alpine, Arch, Artix, CachyOS, Debian, Fedora, FreeBSD, Kali, Linux Mint, macOS, NetBSD, OpenBSD, openSUSE, Ubuntu, Void, Windows and others. Run `./main.sh --list-logos` for the complete list.
+Built-in logos include: `alpine, aperture, apple, arch, artix, cachyos, centos, debian, deepin, elementary, ...` and others. Run `./main.sh --list-logos` for the complete list.
 
 ## Compatibility
 

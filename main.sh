@@ -3,9 +3,9 @@
 export LANG=C
 
 NULLFILE=/dev/null
-VERSION=0.2.0
+VERSION=0.2.1
 UNAME_S=$(uname)
-PLAIN_OUTPUT=0
+PLAIN_OUTPUT=
 LOGO_OVERRIDE=""
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname "$0")" && pwd)
 if [ -n "${SHFETCH_LOGO_DIR:-}" ]; then
@@ -32,6 +32,7 @@ get_os_release_file() {
     else
         return 1
     fi
+
     printf "%s" "$os_release_file"
 }
 
@@ -387,28 +388,24 @@ print_plain_field() {
 
 print_plain() {
     printf '%s\n' "$OS_LOGO"
-    print_plain_field SYSTEM "$INFO_SYSTEM" 80
-    print_plain_field HOST "$INFO_HOST" 80
-    print_plain_field MODEL "$INFO_MODEL" 80
-    print_plain_field KERNEL "$INFO_KERNEL" 80
-    print_plain_field PACKAGE "$INFO_PACKAGE" 40
-    print_plain_field UPTIME "$INFO_UPTIME" 40
+    print_plain_field SYSTEM   "$INFO_SYSTEM"   80
+    print_plain_field HOST     "$INFO_HOST"     80
+    print_plain_field MODEL    "$INFO_MODEL"    80
+    print_plain_field KERNEL   "$INFO_KERNEL"   80
+    print_plain_field PACKAGE  "$INFO_PACKAGE"  40
+    print_plain_field UPTIME   "$INFO_UPTIME"   40
     print_plain_field PLATFORM "$INFO_PLATFORM" 40
-    print_plain_field DESKTOP "$INFO_DESKTOP" 40
-    print_plain_field SHELL "$INFO_SHELL" 40
-    print_plain_field CPU "$INFO_CPU" 100
-    print_plain_field GPU "$INFO_GPU" 100
-    print_plain_field RAM "$INFO_RAM" 40
+    print_plain_field DESKTOP  "$INFO_DESKTOP"  40
+    print_plain_field SHELL    "$INFO_SHELL"    40
+    print_plain_field CPU      "$INFO_CPU"      100
+    print_plain_field GPU      "$INFO_GPU"      100
+    print_plain_field RAM      "$INFO_RAM"      40
 }
 
 draw_table() {
     logo_table_width=$((LOGO_WIDTH + 4))
     logo_table_dash=$(repeat_char "-" $logo_table_width)
     sys_info_width=35
-    if [ "$TERMINAL_WIDTH" -gt $((logo_table_width + 45)) ]; then
-        sys_info_width=$((TERMINAL_WIDTH - logo_table_width - 3))
-        [ "$sys_info_width" -gt 60 ] && sys_info_width=60
-    fi
     sys_info_dash=$(repeat_char "-" "$sys_info_width")
     right_gap=$((sys_info_width - 4))
     
@@ -492,15 +489,15 @@ fill_info() {
     dev_info_max_len=$((LOGO_WIDTH + 30))
 
     line=2
-    if [ -n "$INFO_SYSTEM" ]; then _print_info $line "$left_col" "SYSTEM"   "$right_col" "$INFO_SYSTEM"   $sys_info_max_len; line=$((line+1)); fi
-    if [ -n "$INFO_HOST" ]; then _print_info $line "$left_col" "HOST"     "$right_col" "$INFO_HOST"     $sys_info_max_len; line=$((line+1)); fi
-    if [ -n "$INFO_MODEL" ]; then _print_info $line "$left_col" "MODEL"    "$right_col" "$INFO_MODEL"    $sys_info_max_len; line=$((line+1)); fi
-    if [ -n "$INFO_KERNEL" ]; then _print_info $line "$left_col" "KERNEL"   "$right_col" "$INFO_KERNEL"   $sys_info_max_len; line=$((line+1)); fi
-    if [ -n "$INFO_PACKAGE" ]; then _print_info $line "$left_col" "PACKAGE"  "$right_col" "$INFO_PACKAGE"  $sys_info_max_len; line=$((line+1)); fi
-    if [ -n "$INFO_UPTIME" ]; then _print_info $line "$left_col" "UPTIME"   "$right_col" "$INFO_UPTIME"   $sys_info_max_len; line=$((line+1)); fi
+    if [ -n "$INFO_SYSTEM" ];   then _print_info $line "$left_col" "SYSTEM"   "$right_col" "$INFO_SYSTEM"   $sys_info_max_len; line=$((line+1)); fi
+    if [ -n "$INFO_HOST" ];     then _print_info $line "$left_col" "HOST"     "$right_col" "$INFO_HOST"     $sys_info_max_len; line=$((line+1)); fi
+    if [ -n "$INFO_MODEL" ];    then _print_info $line "$left_col" "MODEL"    "$right_col" "$INFO_MODEL"    $sys_info_max_len; line=$((line+1)); fi
+    if [ -n "$INFO_KERNEL" ];   then _print_info $line "$left_col" "KERNEL"   "$right_col" "$INFO_KERNEL"   $sys_info_max_len; line=$((line+1)); fi
+    if [ -n "$INFO_PACKAGE" ];  then _print_info $line "$left_col" "PACKAGE"  "$right_col" "$INFO_PACKAGE"  $sys_info_max_len; line=$((line+1)); fi
+    if [ -n "$INFO_UPTIME" ];   then _print_info $line "$left_col" "UPTIME"   "$right_col" "$INFO_UPTIME"   $sys_info_max_len; line=$((line+1)); fi
     if [ -n "$INFO_PLATFORM" ]; then _print_info $line "$left_col" "PLATFORM" "$right_col" "$INFO_PLATFORM" $sys_info_max_len; line=$((line+1)); fi
-    if [ -n "$INFO_DESKTOP" ]; then _print_info $line "$left_col" "DESKTOP"  "$right_col" "$INFO_DESKTOP"  $sys_info_max_len; line=$((line+1)); fi
-    if [ -n "$INFO_SHELL" ]; then _print_info $line "$left_col" "SHELL"    "$right_col" "$INFO_SHELL"    $sys_info_max_len; line=$((line+1)); fi
+    if [ -n "$INFO_DESKTOP" ];  then _print_info $line "$left_col" "DESKTOP"  "$right_col" "$INFO_DESKTOP"  $sys_info_max_len; line=$((line+1)); fi
+    if [ -n "$INFO_SHELL" ];    then _print_info $line "$left_col" "SHELL"    "$right_col" "$INFO_SHELL"    $sys_info_max_len; line=$((line+1)); fi
 
     line=13
     if [ "$HAS_CPU" -eq 1 ]; then _print_info $line 4 "CPU" 8 "$INFO_CPU" $dev_info_max_len; line=$((line+1)); fi
@@ -514,7 +511,14 @@ reset_cursor_to_end() {
 }
 
 usage() {
-    printf '%s\n' "Usage: $0 [options]" "  -l, --logo NAME   use a specific logo" "  -p, --plain       print without ANSI cursor controls" "      --version     print version" "      --list-logos  list supported logo names" "  -h, --help        show this help"
+    printf '%s\n' \
+        "Usage: $0 [options]" \
+        "  -l, --logo NAME       use a specific logo" \
+        "  -p, --plain           print without ANSI cursor controls" \
+        "  -t, --table           print use table" \
+        "  -V, --version         print version" \
+        "  -L  --list-logos      list supported logo names" \
+        "  -h, --help            show this help"
 }
 
 while [ "$#" -gt 0 ]; do
@@ -528,11 +532,15 @@ while [ "$#" -gt 0 ]; do
             PLAIN_OUTPUT=1
             shift
             ;;
-        --version)
+        -t|--table)
+            PLAIN_OUTPUT=0
+            shift
+            ;;
+        -V|--version)
             printf 'shfetch %s\n' "$VERSION"
             exit 0
             ;;
-        --list-logos)
+        -L|--list-logos)
             get_logo_names
             exit 0
             ;;
@@ -578,8 +586,11 @@ if command -v tput > $NULLFILE && [ -t 1 ]; then
     esac
 fi
 
-if [ "$PLAIN_OUTPUT" -eq 0 ] && { [ ! -t 1 ] || [ "$TERM" = dumb ] || [ "$TERMINAL_WIDTH" -lt 70 ]; }; then
-    PLAIN_OUTPUT=1
+if [ -z "$PLAIN_OUTPUT" ]; then
+    PLAIN_OUTPUT=0
+    if [ ! -t 1 ] || [ "$TERM" = dumb ] || [ "$TERMINAL_WIDTH" -lt 70 ]; then
+        PLAIN_OUTPUT=1
+    fi
 fi
 
 if [ "$PLAIN_OUTPUT" -eq 1 ]; then
