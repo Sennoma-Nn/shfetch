@@ -28,6 +28,7 @@ printf '%s\n' "$help" | grep -q -- '--plain'
 plain=$(TERM=dumb sh "$SHFETCH" --plain)
 printf '%s\n' "$plain" | grep -q 'SYSTEM'
 printf '%s\n' "$plain" | grep -q 'HOST'
+test "$(printf '%s\n' "$plain" | grep -c '^GPU      :')" -le 1
 
 external_plain=$(cd /tmp && TERM=dumb sh "$SHFETCH" --plain -l freebsd)
 printf '%s\n' "$external_plain" | grep -q "FreeBSD\|SYSTEM"

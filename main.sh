@@ -4,6 +4,7 @@ export LANG=C
 
 NULLFILE=/dev/null
 VERSION=0.2.0
+UNAME_S=$(uname)
 PLAIN_OUTPUT=0
 LOGO_OVERRIDE=""
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname "$0")" && pwd)
@@ -35,7 +36,7 @@ get_os_release_file() {
 }
 
 get_os_id() {
-    if [ "$(uname)" = "Linux" ]; then
+    if [ "$UNAME_S" = "Linux" ]; then
         get_os_value ID
     else
         platform=$(uname | lower)
@@ -61,12 +62,12 @@ get_os_id_with_override() {
 }
 
 get_os_name() {
-    if [ "$(uname)" = "Linux" ]; then
+    if [ "$UNAME_S" = "Linux" ]; then
         name=$(get_os_value PRETTY_NAME)
         [ -n "$name" ] && printf '%s' "$name" && return 0
         get_os_value NAME
     else
-        uname -s
+        printf '%s' "$UNAME_S"
     fi
 }
 
@@ -75,7 +76,7 @@ get_arch() {
 }
 
 is_android() {
-    [ "$(uname)" = "Linux" ] || return 1
+    [ "$UNAME_S" = "Linux" ] || return 1
 
     uname -o 2> $NULLFILE | grep -q "Android" && return 0
 
@@ -99,7 +100,7 @@ get_host_name() {
 }
 
 get_model() {
-    if [ "$(uname)" = "Linux" ]; then
+    if [ "$UNAME_S" = "Linux" ]; then
         if [ -r /sys/devices/virtual/dmi/id/product_name ]; then
             model=$(cat /sys/devices/virtual/dmi/id/product_name)
             [ -n "$model" ] && printf '%s' "$model" && return 0
@@ -120,7 +121,7 @@ get_kernel() {
 }
 
 get_uptime() {
-    if [ "$(uname)" = "Linux" ]; then
+    if [ "$UNAME_S" = "Linux" ]; then
         if [ -r /proc/uptime ]; then
             seconds=$(awk '{print int($1)}' /proc/uptime)
             days=$((seconds / 86400))
@@ -210,7 +211,7 @@ join_comma() {
 }
 
 get_cpu() {
-    if [ "$(uname)" = "Linux" ]; then
+    if [ "$UNAME_S" = "Linux" ]; then
         if command -v lscpu > $NULLFILE; then
             model="$(lscpu 2> $NULLFILE | sed -n 's/^[[:space:]]*Model name:[[:space:]]*//p' | join_comma)"
             cores="$(lscpu 2> $NULLFILE | sed -n 's/^[[:space:]]*CPU(s):[[:space:]]*//p' | tr -d ' ' | head -n 1)"
@@ -337,6 +338,45 @@ truncate_text() {
     printf '%s' "$value" | awk -v max="$max_len" 'BEGIN { if (max < 4) max=4 } { if (length($0) > max) printf "%s...", substr($0, 1, max-3); else printf "%s", $0 }'
 }
 
+collect_info() {
+    INFO_SYSTEM=
+    INFO_HOST=
+    INFO_MODEL=
+    INFO_KERNEL=
+    INFO_PACKAGE=
+    INFO_UPTIME=
+    INFO_PLATFORM=
+    INFO_DESKTOP=
+    INFO_SHELL=
+    INFO_CPU=
+    INFO_GPU=
+    INFO_RAM=
+    HAS_CPU=0
+    HAS_GPU=0
+    HAS_RAM=0
+
+    INFO_SYSTEM=$(get_os_name 2> $NULLFILE) || INFO_SYSTEM=
+    INFO_HOST=$(get_host_name 2> $NULLFILE) || INFO_HOST=
+    INFO_MODEL=$(get_model 2> $NULLFILE) || INFO_MODEL=
+    INFO_KERNEL="$UNAME_S $(get_kernel 2> $NULLFILE)"
+    INFO_PACKAGE=$(get_package_manager 2> $NULLFILE) || INFO_PACKAGE=
+    INFO_UPTIME=$(get_uptime 2> $NULLFILE) || INFO_UPTIME=
+    INFO_PLATFORM=$(get_arch 2> $NULLFILE) || INFO_PLATFORM=
+    INFO_DESKTOP=$(get_de 2> $NULLFILE) || INFO_DESKTOP=
+    INFO_SHELL=$(get_shell 2> $NULLFILE) || INFO_SHELL=
+
+    if INFO_CPU=$(get_cpu 2> $NULLFILE); then HAS_CPU=1; fi
+    if INFO_GPU=$(get_gpu 2> $NULLFILE); then HAS_GPU=1; fi
+    if INFO_RAM=$(get_mem 2> $NULLFILE); then HAS_RAM=1; fi
+
+    DEVICE_LINES=0
+    [ "$HAS_CPU" -eq 1 ] && DEVICE_LINES=$((DEVICE_LINES + 1))
+    [ "$HAS_GPU" -eq 1 ] && DEVICE_LINES=$((DEVICE_LINES + 1))
+    [ "$HAS_RAM" -eq 1 ] && DEVICE_LINES=$((DEVICE_LINES + 1))
+    [ "$DEVICE_LINES" -gt 0 ] && DEVICE_LINES=$((DEVICE_LINES + 2))
+    [ "$DEVICE_LINES" -eq 0 ] && DEVICE_LINES=$((DEVICE_LINES - 1))
+}
+
 print_plain_field() {
     label=$1
     value=$2
@@ -347,29 +387,21 @@ print_plain_field() {
 
 print_plain() {
     printf '%s\n' "$OS_LOGO"
-    print_plain_field SYSTEM "$(get_os_name 2> $NULLFILE)" 80
-    print_plain_field HOST "$(get_host_name 2> $NULLFILE)" 80
-    print_plain_field MODEL "$(get_model 2> $NULLFILE)" 80
-    print_plain_field KERNEL "$(uname) $(get_kernel 2> $NULLFILE)" 80
-    print_plain_field PACKAGE "$(get_package_manager 2> $NULLFILE)" 40
-    print_plain_field UPTIME "$(get_uptime 2> $NULLFILE)" 40
-    print_plain_field PLATFORM "$(get_arch 2> $NULLFILE)" 40
-    print_plain_field DESKTOP "$(get_de 2> $NULLFILE)" 40
-    print_plain_field SHELL "$(get_shell 2> $NULLFILE)" 40
-    print_plain_field CPU "$(get_cpu 2> $NULLFILE)" 100
-    print_plain_field GPU "$(get_gpu 2> $NULLFILE)" 100
-    print_plain_field RAM "$(get_mem 2> $NULLFILE)" 40
+    print_plain_field SYSTEM "$INFO_SYSTEM" 80
+    print_plain_field HOST "$INFO_HOST" 80
+    print_plain_field MODEL "$INFO_MODEL" 80
+    print_plain_field KERNEL "$INFO_KERNEL" 80
+    print_plain_field PACKAGE "$INFO_PACKAGE" 40
+    print_plain_field UPTIME "$INFO_UPTIME" 40
+    print_plain_field PLATFORM "$INFO_PLATFORM" 40
+    print_plain_field DESKTOP "$INFO_DESKTOP" 40
+    print_plain_field SHELL "$INFO_SHELL" 40
+    print_plain_field CPU "$INFO_CPU" 100
+    print_plain_field GPU "$INFO_GPU" 100
+    print_plain_field RAM "$INFO_RAM" 40
 }
 
 draw_table() {
-    # 测试是否能得到硬件信息，得到 +1 因为要多一行显示
-    get_cpu > $NULLFILE 2>&1 && DEVICE_LINES=$((DEVICE_LINES + 1))
-    get_gpu > $NULLFILE 2>&1 && DEVICE_LINES=$((DEVICE_LINES + 1))
-    get_mem > $NULLFILE 2>&1 && DEVICE_LINES=$((DEVICE_LINES + 1))
-
-    [ "$DEVICE_LINES" -gt 0 ] && DEVICE_LINES=$((DEVICE_LINES + 2)) # 如果得到其中一项，就要显示硬键信息表，要给表格留两行空行
-    [ "$DEVICE_LINES" -eq 0 ] && DEVICE_LINES=$((DEVICE_LINES - 1)) # 如果一项都没都得到，那就不显示最下面的表格底部了，要 -1 行
-
     logo_table_width=$((LOGO_WIDTH + 4))
     logo_table_dash=$(repeat_char "-" $logo_table_width)
     sys_info_width=35
@@ -460,20 +492,20 @@ fill_info() {
     dev_info_max_len=$((LOGO_WIDTH + 30))
 
     line=2
-    if v=$(get_os_name 2> $NULLFILE);         then _print_info $line "$left_col" "SYSTEM"   "$right_col" "$v"          $sys_info_max_len; line=$((line+1)); fi
-    if v=$(get_host_name 2> $NULLFILE);       then _print_info $line "$left_col" "HOST"     "$right_col" "$v"          $sys_info_max_len; line=$((line+1)); fi
-    if v=$(get_model 2> $NULLFILE);            then _print_info $line "$left_col" "MODEL"    "$right_col" "$v"          $sys_info_max_len; line=$((line+1)); fi
-    if v=$(get_kernel 2> $NULLFILE);          then _print_info $line "$left_col" "KERNEL"   "$right_col" "$(uname) $v" $sys_info_max_len; line=$((line+1)); fi
-    if v=$(get_package_manager 2> $NULLFILE); then _print_info $line "$left_col" "PACKAGE"  "$right_col" "$v"          $sys_info_max_len; line=$((line+1)); fi
-    if v=$(get_uptime 2> $NULLFILE);          then _print_info $line "$left_col" "UPTIME"   "$right_col" "$v"          $sys_info_max_len; line=$((line+1)); fi
-    if v=$(get_arch 2> $NULLFILE);            then _print_info $line "$left_col" "PLATFORM" "$right_col" "$v"          $sys_info_max_len; line=$((line+1)); fi
-    if v=$(get_de 2> $NULLFILE);              then _print_info $line "$left_col" "DESKTOP"  "$right_col" "$v"          $sys_info_max_len; line=$((line+1)); fi
-    if v=$(get_shell 2> $NULLFILE);           then _print_info $line "$left_col" "SHELL"    "$right_col" "$v"          $sys_info_max_len; line=$((line+1)); fi
+    if [ -n "$INFO_SYSTEM" ]; then _print_info $line "$left_col" "SYSTEM"   "$right_col" "$INFO_SYSTEM"   $sys_info_max_len; line=$((line+1)); fi
+    if [ -n "$INFO_HOST" ]; then _print_info $line "$left_col" "HOST"     "$right_col" "$INFO_HOST"     $sys_info_max_len; line=$((line+1)); fi
+    if [ -n "$INFO_MODEL" ]; then _print_info $line "$left_col" "MODEL"    "$right_col" "$INFO_MODEL"    $sys_info_max_len; line=$((line+1)); fi
+    if [ -n "$INFO_KERNEL" ]; then _print_info $line "$left_col" "KERNEL"   "$right_col" "$INFO_KERNEL"   $sys_info_max_len; line=$((line+1)); fi
+    if [ -n "$INFO_PACKAGE" ]; then _print_info $line "$left_col" "PACKAGE"  "$right_col" "$INFO_PACKAGE"  $sys_info_max_len; line=$((line+1)); fi
+    if [ -n "$INFO_UPTIME" ]; then _print_info $line "$left_col" "UPTIME"   "$right_col" "$INFO_UPTIME"   $sys_info_max_len; line=$((line+1)); fi
+    if [ -n "$INFO_PLATFORM" ]; then _print_info $line "$left_col" "PLATFORM" "$right_col" "$INFO_PLATFORM" $sys_info_max_len; line=$((line+1)); fi
+    if [ -n "$INFO_DESKTOP" ]; then _print_info $line "$left_col" "DESKTOP"  "$right_col" "$INFO_DESKTOP"  $sys_info_max_len; line=$((line+1)); fi
+    if [ -n "$INFO_SHELL" ]; then _print_info $line "$left_col" "SHELL"    "$right_col" "$INFO_SHELL"    $sys_info_max_len; line=$((line+1)); fi
 
     line=13
-    if v=$(get_cpu 2> $NULLFILE); then _print_info $line 4 "CPU" 8 "$v" $dev_info_max_len; line=$((line+1)); fi
-    if v=$(get_gpu 2> $NULLFILE); then _print_info $line 4 "GPU" 8 "$v" $dev_info_max_len; line=$((line+1)); fi
-    if v=$(get_mem 2> $NULLFILE); then _print_info $line 4 "RAM" 8 "$v" $dev_info_max_len; line=$((line+1)); fi
+    if [ "$HAS_CPU" -eq 1 ]; then _print_info $line 4 "CPU" 8 "$INFO_CPU" $dev_info_max_len; line=$((line+1)); fi
+    if [ "$HAS_GPU" -eq 1 ]; then _print_info $line 4 "GPU" 8 "$INFO_GPU" $dev_info_max_len; line=$((line+1)); fi
+    if [ "$HAS_RAM" -eq 1 ]; then _print_info $line 4 "RAM" 8 "$INFO_RAM" $dev_info_max_len; line=$((line+1)); fi
 }
 
 reset_cursor_to_end() {
@@ -535,7 +567,7 @@ fi
 OS_ID=$(get_os_id)
 OS_LOGO=$(get_logo)
 LOGO_WIDTH=$(get_logo_width)
-DEVICE_LINES=0
+collect_info
 
 TERMINAL_WIDTH=${COLUMNS:-80}
 if command -v tput > $NULLFILE && [ -t 1 ]; then
