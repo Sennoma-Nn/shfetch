@@ -69,14 +69,9 @@ is_android() {
     return 1
 }
 
-get_platform() {
-    arch=$(get_arch)
-    printf "%s" "$arch"
-}
-
 get_host_name() {
     if [ "$(uname)" = "Linux" ]; then
-        name=$(hostnamectl 2>/dev/null | sed -n 's/^[[:space:]]*Hardware Model:[[:space:]]*//p' | head -n1)
+        name=$(hostnamectl 2> $NULLFILE | sed -n 's/^[[:space:]]*Hardware Model:[[:space:]]*//p' | head -n1)
         if [ -n "$name" ]; then
             printf '%s' "$name"
             return 0
@@ -151,7 +146,8 @@ get_shell_path() {
 }
 
 get_shell() {
-    shell_path=$(get_shell_path)
+    shell_path=$(get_shell_path) || return 1
+    [ -n "$shell_path" ] || return 1
     basename "$shell_path"
 }
 
@@ -242,7 +238,7 @@ get_mem() {
     mem_kb=$(awk '/^MemTotal:/{print $2; exit}' /proc/meminfo)
     [ -n "$mem_kb" ] || return 1
 
-    mem_gib=$(awk "BEGIN {printf \"%.1f\", $mem_kb / 1024 / 1024}")
+    mem_gib=$(awk -v kb="$mem_kb" 'BEGIN{printf "%.1f", kb/1024/1024}')
     printf "%s GiB" "$mem_gib"
 }
 
@@ -545,11 +541,13 @@ get_logo_width() {
 }
 
 draw_table() {
+    # 测试是否能得到硬件信息，得到 +1 因为要多一行显示
     get_cpu > $NULLFILE 2>&1 && DEVICE_LINES=$((DEVICE_LINES + 1))
     get_gpu > $NULLFILE 2>&1 && DEVICE_LINES=$((DEVICE_LINES + 1))
     get_mem > $NULLFILE 2>&1 && DEVICE_LINES=$((DEVICE_LINES + 1))
-    [ "$DEVICE_LINES" -gt 0 ] && DEVICE_LINES=$((DEVICE_LINES + 2))
-    [ "$DEVICE_LINES" -eq 0 ] && DEVICE_LINES=$((DEVICE_LINES - 1))
+
+    [ "$DEVICE_LINES" -gt 0 ] && DEVICE_LINES=$((DEVICE_LINES + 2)) # 如果得到其中一项，就要显示硬键信息表，要给表格留两行空行
+    [ "$DEVICE_LINES" -eq 0 ] && DEVICE_LINES=$((DEVICE_LINES - 1)) # 如果一项都没都得到，那就不显示最下面的表格底部了，要 -1 行
 
     logo_table_width=$((LOGO_WIDTH + 4))
     logo_table_dash=$(repeat_char "-" $logo_table_width)
@@ -640,7 +638,7 @@ fill_info() {
     if v=$(get_kernel 2> $NULLFILE);          then _print_info $line "$left_col" "KERNEL"   "$right_col" "$(uname) $v" $sys_info_max_len; line=$((line+1)); fi
     if v=$(get_package_manager 2> $NULLFILE); then _print_info $line "$left_col" "PACKAGE"  "$right_col" "$v"          $sys_info_max_len; line=$((line+1)); fi
     if v=$(get_uptime 2> $NULLFILE);          then _print_info $line "$left_col" "UPTIME"   "$right_col" "$v"          $sys_info_max_len; line=$((line+1)); fi
-    if v=$(get_platform 2> $NULLFILE);        then _print_info $line "$left_col" "PLATFORM" "$right_col" "$v"          $sys_info_max_len; line=$((line+1)); fi
+    if v=$(get_arch 2> $NULLFILE);            then _print_info $line "$left_col" "PLATFORM" "$right_col" "$v"          $sys_info_max_len; line=$((line+1)); fi
     if v=$(get_de 2> $NULLFILE);              then _print_info $line "$left_col" "DESKTOP"  "$right_col" "$v"          $sys_info_max_len; line=$((line+1)); fi
     if v=$(get_shell 2> $NULLFILE);           then _print_info $line "$left_col" "SHELL"    "$right_col" "$v"          $sys_info_max_len; line=$((line+1)); fi
 
