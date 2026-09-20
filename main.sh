@@ -7,7 +7,13 @@ VERSION=0.2.0
 PLAIN_OUTPUT=0
 LOGO_OVERRIDE=""
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname "$0")" && pwd)
-LOGO_DIR=${SHFETCH_LOGO_DIR:-"$SCRIPT_DIR/logos"}
+if [ -n "${SHFETCH_LOGO_DIR:-}" ]; then
+    LOGO_DIR=$SHFETCH_LOGO_DIR
+elif [ -d "$SCRIPT_DIR/logos" ]; then
+    LOGO_DIR=$SCRIPT_DIR/logos
+else
+    LOGO_DIR=$SCRIPT_DIR/../share/shfetch/logos
+fi
 
 upper() {
     tr '[:lower:]' '[:upper:]'

@@ -9,15 +9,13 @@
 ```sh
 git clone https://github.com/hotalexnet/shfetch.git
 cd shfetch
-chmod +x main.sh
-./main.sh
+./install.sh
 ```
 
-You can also install it for your user (copy the `logos` directory alongside the script):
+The installer defaults to `~/.local`. To install system-wide:
 
 ```sh
-install -Dm755 main.sh "$HOME/.local/bin/shfetch"
-cp -R logos "$HOME/.local/bin/logos"
+PREFIX=/usr/local ./install.sh
 ```
 
 Logo artwork is stored as one UTF-8 text file per logo under [`logos/`](logos/). To use a different logo directory, set `SHFETCH_LOGO_DIR`.
