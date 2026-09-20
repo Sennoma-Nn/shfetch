@@ -1,6 +1,6 @@
 # shfetch
 
-`shfetch` is a small system-information viewer written in POSIX shell. It displays the operating system, host, hardware, desktop, shell and package manager using a built-in Braille logo.
+`shfetch` is a small system-information viewer written in POSIX shell. It displays the operating system, host, hardware, desktop, shell and package manager using built-in terminal logos.
 
 ![shfetch example](docs/demo.svg)
 
@@ -13,11 +13,14 @@ chmod +x main.sh
 ./main.sh
 ```
 
-You can also install it for your user:
+You can also install it for your user (copy the `logos` directory alongside the script):
 
 ```sh
 install -Dm755 main.sh "$HOME/.local/bin/shfetch"
+cp -R logos "$HOME/.local/bin/logos"
 ```
+
+Logo artwork is stored as one UTF-8 text file per logo under [`logos/`](logos/). To use a different logo directory, set `SHFETCH_LOGO_DIR`.
 
 ## Usage
 
