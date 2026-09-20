@@ -19,6 +19,7 @@ get_os_id() {
         printf "%s" "$OS_RELEASE" | grep '^ID=' | cut -d= -f2 | tr -d '"'
     else
         printf "" # 待实现
+        return 1
     fi
 }
 
@@ -27,6 +28,7 @@ get_os_name() {
         printf "%s" "$OS_RELEASE" | grep '^PRETTY_NAME=' | cut -d= -f2 | tr -d '"()'
     else
         printf "" # 待实现
+        return 1
     fi
 }
 
@@ -35,9 +37,9 @@ get_arch() {
 }
 
 is_android() {
-    uname -o 2> $NULLFILE | grep -q "Android" && return 0
-
     [ "$(uname)" = "Linux" ] || return 1
+
+    uname -o 2> $NULLFILE | grep -q "Android" && return 0
 
     if command -v getprop > $NULLFILE; then
         build_sdk=$(getprop ro.build.version.sdk 2> $NULLFILE)
@@ -64,6 +66,7 @@ get_host_name() {
         fi
     else
         printf "" # 待实现
+        return 1
     fi
 }
 
@@ -84,6 +87,7 @@ get_uptime() {
         fi
     else
         printf "" # 待实现
+        return 1
     fi
 }
 
@@ -127,35 +131,49 @@ get_package_manager() {
     fi
 }
 
+join_comma() {
+    awk 'NR>1{printf ", "} {printf "%s", $0} END{print ""}'
+}
+
 get_cpu() {
     if [ "$(uname)" = "Linux" ]; then
         if command -v lscpu > $NULLFILE; then
-            model="$(lscpu 2> $NULLFILE | sed -n 's/^[[:space:]]*Model name:[[:space:]]*//p' | awk 'NR>1{printf ", "} {printf "%s", $0} END{print ""}')"
+            model="$(lscpu 2> $NULLFILE | sed -n 's/^[[:space:]]*Model name:[[:space:]]*//p' | join_comma)"
             cores="$(lscpu 2> $NULLFILE | sed -n 's/^[[:space:]]*CPU(s):[[:space:]]*//p' | head -n 1)"
-
-            printf "%s (%s)" "$model" "$cores"
-            return 0
         elif [ -f /proc/cpuinfo ]; then
-            model="$(sed -nE 's/^(model name|Hardware)[[:space:]]*:[[:space:]]*//p' /proc/cpuinfo | head -n1)"
+            model="$(sed -nE 's/^(model name|Hardware)[[:space:]]*:[[:space:]]*//p' /proc/cpuinfo | awk '!seen[$0]++' | join_comma)"
             cores="$(grep -c '^processor' /proc/cpuinfo)"
 
             if is_android && [ -z "$model" ]; then
-                model=$(getprop ro.soc.model)
+                model=$(getprop ro.soc.model 2> $NULLFILE)
             fi
-
-            printf "%s (%s)" "$model" "$cores"
-            return 0
         fi
+
+        [ -z "$model" ] && model="UNKNOWN CPU"
+
+        if [ -n "$cores" ]; then
+            printf "%s (%s)" "$model" "$cores"
+        else
+            printf "%s" "$model"
+        fi
+
+        return 0
     else
         printf "" # 待实现
+        return 1
     fi
 }
 
 get_gpu() {
-    if command -v nvidia-smi > $NULLFILE; then
-        nvidia-smi --query-gpu=gpu_name --format=csv,noheader 2> $NULLFILE
+    if command -v lspci > $NULLFILE; then
+        lspci 2> $NULLFILE | grep -iE "VGA|3D|Display" | cut -d':' -f3- | tr '\n' ', '| sed 's/^[[:space:]]*//' | sed 's/,$//'
+        return 0
+    elif command -v nvidia-smi > $NULLFILE; then
+        nvidia-smi --query-gpu=gpu_name --format=csv,noheader 2> $NULLFILE | join_comma
+        return 0
     else
         printf "" # 待实现
+        return 1
     fi
 }
 
@@ -499,35 +517,38 @@ fill_logo() {
     done
 }
 
+_print_info() {
+    row=$1
+    left_col=$2
+    left_text="$3"
+    right_col=$4
+    right_text=$(printf "%s" "$5" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
+    max_len=$6
+
+    printf "\033[u\033[%dB\033[%dG%s\033[%dG: %.${max_len}s" "$row" "$left_col" "$left_text" "$right_col" "$right_text"
+}
+
 fill_info() {
     printf "\033[0m"
 
-    _print_info() {
-        row=$1
-        left_col=$2
-        left_text="$3"
-        right_col=$4
-        right_text=$(printf "%s" "$5" | tr '[:lower:]' '[:upper:]' | tr '-' '_')
-        max_len=$6
-
-        printf "\033[u\033[%dB\033[%dG%s\033[%dG: %.${max_len}s" "$row" "$left_col" "$left_text" "$right_col" "$right_text"
-    }
-
     left_col=$((LOGO_WIDTH + 9))
     right_col=$((LOGO_WIDTH + 9 + 9))
-    max_len=21
-    _print_info 2 "$left_col" "SYSTEM" "$right_col" "$(get_os_name)" "$max_len"
-    _print_info 3 "$left_col" "PLATFORM" "$right_col" "$(get_platform)" "$max_len"
-    _print_info 4 "$left_col" "HOST" "$right_col" "$(get_host_name)" "$max_len"
-    _print_info 5 "$left_col" "KERNEL" "$right_col" "$(uname) $(get_kernel)" "$max_len"
-    _print_info 6 "$left_col" "UPTIME" "$right_col" "$(get_uptime)" "$max_len"
-    _print_info 7 "$left_col" "SHELL" "$right_col" "$(get_shell)" "$max_len"
-    _print_info 8 "$left_col" "DESKTOP" "$right_col" "$(get_de)" "$max_len"
-    _print_info 9 "$left_col" "PACKAGE" "$right_col" "$(get_package_manager)" "$max_len"
 
-    _print_info 13 4 "CPU" 8 "$(get_cpu)" 47
-    _print_info 14 4 "GPU" 8 "$(get_gpu)" 47
-    _print_info 15 4 "RAM" 8 "$(get_meminfo)" 47
+    sys_info_max_len=21
+    dev_info_max_len=$((LOGO_WIDTH + 30))
+
+    _print_info 2 "$left_col" "SYSTEM" "$right_col" "$(get_os_name 2> $NULLFILE)" $sys_info_max_len
+    _print_info 3 "$left_col" "PLATFORM" "$right_col" "$(get_platform 2> $NULLFILE)" $sys_info_max_len
+    _print_info 4 "$left_col" "HOST" "$right_col" "$(get_host_name 2> $NULLFILE)" $sys_info_max_len
+    _print_info 5 "$left_col" "KERNEL" "$right_col" "$(uname) $(get_kernel 2> $NULLFILE)" $sys_info_max_len
+    _print_info 6 "$left_col" "UPTIME" "$right_col" "$(get_uptime 2> $NULLFILE)" $sys_info_max_len
+    _print_info 7 "$left_col" "SHELL" "$right_col" "$(get_shell 2> $NULLFILE)" $sys_info_max_len
+    _print_info 8 "$left_col" "DESKTOP" "$right_col" "$(get_de 2> $NULLFILE)" $sys_info_max_len
+    _print_info 9 "$left_col" "PACKAGE" "$right_col" "$(get_package_manager 2> $NULLFILE)" $sys_info_max_len
+
+    _print_info 13 4 "CPU" 8 "$(get_cpu 2> $NULLFILE)" $dev_info_max_len
+    _print_info 14 4 "GPU" 8 "$(get_gpu 2> $NULLFILE)" $dev_info_max_len
+    _print_info 15 4 "RAM" 8 "$(get_meminfo 2> $NULLFILE)" $dev_info_max_len
 }
 
 reset_cursor_to_end() {
