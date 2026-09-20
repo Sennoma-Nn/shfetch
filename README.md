@@ -18,6 +18,14 @@ The installer defaults to `~/.local`. To install system-wide:
 PREFIX=/usr/local ./install.sh
 ```
 
+For packaging without installing into the live filesystem:
+
+```sh
+DESTDIR="$PWD/package" PREFIX=/usr/local ./install.sh
+```
+
+Preview an installation with `./install.sh --dry-run`.
+
 Logo artwork is stored as one UTF-8 text file per logo under [`logos/`](logos/). To use a different logo directory, set `SHFETCH_LOGO_DIR`.
 
 ## Usage

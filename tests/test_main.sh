@@ -38,6 +38,16 @@ PREFIX="$install_root" sh "$INSTALL"
 installed_plain=$(TERM=dumb "$install_root/bin/shfetch" --plain -l openbsd)
 printf '%s\n' "$installed_plain" | grep -q 'SYSTEM'
 
+dry_root="$install_root/dry-run"
+dry_output="$install_root/dry-run.out"
+PREFIX="$dry_root" sh "$INSTALL" --dry-run >"$dry_output"
+test ! -e "$dry_root/bin/shfetch"
+grep -q 'Dry run complete' "$dry_output"
+
+stage_root="$install_root/stage"
+DESTDIR="$stage_root" PREFIX=/opt sh "$INSTALL"
+test -x "$stage_root/opt/bin/shfetch"
+
 if sh "$SHFETCH" --does-not-exist >/dev/null 2>&1; then
     echo 'unknown option unexpectedly succeeded' >&2
     exit 1
