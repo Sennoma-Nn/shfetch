@@ -3,7 +3,7 @@
 export LANG=C
 
 NULLFILE=/dev/null
-VERSION=0.2.2
+VERSION=0.2.3
 UNAME_S=$(uname)
 PLAIN_OUTPUT=
 LOGO_OVERRIDE=""
