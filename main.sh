@@ -608,5 +608,6 @@ else
     fill_logo
     fill_info
     reset_cursor_to_end
-    printf "\n"
 fi
+
+printf "\n"
