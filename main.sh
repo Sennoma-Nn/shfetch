@@ -3,7 +3,7 @@
 export LANG=C
 
 NULLFILE=/dev/null
-VERSION=0.2.1
+VERSION=0.2.2
 UNAME_S=$(uname)
 PLAIN_OUTPUT=
 LOGO_OVERRIDE=""
@@ -388,9 +388,8 @@ collect_info() {
 print_plain_field() {
     label=$1
     value=$2
-    max_len=${3:-80}
     [ -n "$value" ] || return 0
-    printf '%-10s: %s\n' "$label" "$(truncate_text "$max_len" "$value")"
+    printf '%-10s: %s\n' "$label" "$value"
 }
 
 print_plain() {
@@ -595,7 +594,7 @@ fi
 
 if [ -z "$PLAIN_OUTPUT" ]; then
     PLAIN_OUTPUT=0
-    if [ ! -t 1 ] || [ "$TERM" = dumb ] || [ "$TERMINAL_WIDTH" -lt 70 ]; then
+    if [ ! -t 1 ] || [ "$TERM" = dumb ] || [ "$TERMINAL_WIDTH" -lt $((LOGO_WIDTH + 42)) ]; then
         PLAIN_OUTPUT=1
     fi
 fi
