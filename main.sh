@@ -199,16 +199,21 @@ get_cpu() {
         if command -v lscpu > $NULLFILE; then
             model="$(lscpu 2> $NULLFILE | sed -n 's/^[[:space:]]*Model name:[[:space:]]*//p' | join_comma)"
             cores="$(lscpu 2> $NULLFILE | sed -n 's/^[[:space:]]*CPU(s):[[:space:]]*//p' | tr -d ' ' | head -n 1)"
-        elif [ -f /proc/cpuinfo ]; then
-            model="$(sed -nE 's/^(model name|Hardware)[[:space:]]*:[[:space:]]*//p' /proc/cpuinfo | awk '!seen[$0]++' | join_comma)"
-            cores="$(grep -c '^processor' /proc/cpuinfo)"
-
-            if is_android && [ -z "$model" ]; then
-                model=$(getprop ro.soc.model 2> $NULLFILE)
-            fi
+        fi
+        
+        if [ -f /proc/cpuinfo ]; then
+            [ -z "$model" ] && model="$(sed -nE 's/^(model name|Hardware)[[:space:]]*:[[:space:]]*//p' /proc/cpuinfo | awk '!seen[$0]++' | join_comma)"
+            [ -z "$cores" ] && cores="$(grep -c '^processor' /proc/cpuinfo)"
         fi
 
-        [ -z "$model" ] && model="UNKNOWN CPU"
+        if is_android && [ -z "$model" ]; then
+            model=$(getprop ro.soc.model 2> $NULLFILE)
+        fi
+
+        if [ -z "$model" ]; then
+            [ -z "$cores" ] && return 1
+            model="Unknown CPU"
+        fi
 
         if [ -n "$cores" ]; then
             printf "%s (%s)" "$model" "$cores"
